@@ -1,0 +1,43 @@
+#!/usr/bin/env nix-shell
+#!nix-shell -p "haskellPackages.ghcWithPackages (h: with h; [shake])"
+#!nix-shell -i runghc
+
+import Data.Functor
+import Data.List
+import Development.Shake
+import Development.Shake.Command
+import Development.Shake.FilePath
+import Development.Shake.Util
+
+main :: IO ()
+main = shakeArgs shakeOptions{shakeFiles=".shake"} $ do
+    let
+        mainbin = "./_build/main"
+
+    want [mainbin]
+
+    phony "clean" $ do
+        putNormal "Cleaning files"
+        -- liftIO $ removeFiles "." [
+        --     "//*.dyn_hi"
+        --   , "//*.dyn_o"
+        --   , "//*.hi"
+        --   , "//*.o"
+        --   , "//*.dump-*"
+        --   , mainbin
+        --   ]
+        removeFilesAfter "_build" ["//*"]
+
+    phony "build" $ do
+        need [mainbin]
+
+    mainbin %> \out -> do
+        hsfiles <- getDirectoryFiles "" [ "*.hs"]
+        need hsfiles
+        cmd "nix-shell" $
+          [ "./shell.nix"
+          , "--run", "ghc -O2"
+          <> " -odir _build -hidir _build"
+          <> " -o " <> out <> " "
+          <> intercalate " " hsfiles
+          ]
